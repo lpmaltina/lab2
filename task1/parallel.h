@@ -1,6 +1,11 @@
 #ifndef PARALLEL
 #define PARALLEL
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <mpi.h>
+
+
 void parallelProduct(
     double* matrix,
     double* vector,
