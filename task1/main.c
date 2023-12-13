@@ -21,7 +21,7 @@ int main(int argc, char** argv) {
     double time_elapsed = 0;
     int dim = strtol(argv[1], NULL, 10);
 
-    MPI_Init(&argc, &argv);
+    MPI_Init(&argc, &argv); 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
@@ -52,10 +52,10 @@ int main(int argc, char** argv) {
         sprintf(fileNameResult, "output/parallel-product-%d-%d.txt", matrixRows, matrixCols);
         writeArray(fileNameResult, product, matrixRows);
         printf(
-                "Time (dim=%d, n_threads=%d): %lf\n",
-                dim,
-                size,
-                time_elapsed
+            "Time (dim=%d, n_threads=%d): %lf\n",
+            dim,
+            size,
+            time_elapsed
         );
     }
 
