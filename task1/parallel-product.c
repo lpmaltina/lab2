@@ -1,49 +1,64 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <mpi.h>
+#include "utils.h"
 
-void parallelProduct(double* matrix, double* vector, double* result, int rows, int cols, int rank, int size) {
-    int blockSize = rows / size;
-    int remainingRows = rows % size;
-    int myRows = rank < remainingRows ? blockSize + 1 : blockSize;
+void parallelProduct(double* matrix, double* vec, double* result, int matrixRows, int matrixCols, int rank, int size) {
 
-    double* myMatrix = (double*)malloc(myRows * cols * sizeof(double));
-    double* myResult = (double*)malloc(myRows * sizeof(double));
+    int blockRows = matrixRows / size;
+    int remainderRows = matrixRows % size;
+    int localBlockRows = blockRows;
+    if (rank < remainderRows) {
+        localBlockRows++;
+    }
 
-    int* sendCounts = (int*)malloc(size * sizeof(int));
-    int* displacements = (int*)malloc(size * sizeof(int));
+    double* localMatrixBlock = (double*)malloc(sizeof(double) * localBlockRows * matrixCols);
+    int* displacements = (int*)malloc(sizeof(int) * size);
+    int* counts = (int*)malloc(sizeof(int) * size);
+
+    int offset = 0;
+    for (int i = 0; i < size; ++i) {
+        displacements[i] = offset * matrixCols;
+        counts[i] = localBlockRows * matrixCols;
+        if (i < remainderRows) {
+            counts[i] += matrixCols;
+        }
+        offset += counts[i] / matrixCols;
+    }
+
+    MPI_Scatterv(matrix, counts, displacements, MPI_DOUBLE, localMatrixBlock, localBlockRows * matrixCols, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(vec, matrixCols, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    double* localVector = (double*)malloc(sizeof(double) * matrixCols);
+
+    for (int i = 0; i < localBlockRows; ++i) {
+        result[i] = 0.0;
+        for (int j = 0; j < matrixCols; ++j) {
+            result[i] += localMatrixBlock[i * matrixCols + j] * localVector[j];
+        }
+    }
+
+    double* allResults = (double*)malloc(sizeof(double) * matrixRows);
+    int* recvCounts = (int*)malloc(sizeof(int) * size);
+    int* displacementsGather = (int*)malloc(sizeof(int) * size);
+
+    for (int i = 0; i < size; ++i) {
+        recvCounts[i] = blockRows + (i < remainderRows ? 1 : 0);
+        displacementsGather[i] = i * blockRows;
+    }
+
+    MPI_Gatherv(result, localBlockRows, MPI_DOUBLE, allResults, recvCounts, displacementsGather, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     if (rank == 0) {
-        int offset = 0;
-        for (int i = 0; i < size; i++) {
-            sendCounts[i] = (i < remainingRows ? blockSize + 1 : blockSize) * cols;
-            displacements[i] = offset;
-            offset += sendCounts[i];
+        for (int i = 0; i < matrixRows; ++i) {
+            result[i] = allResults[i];
         }
     }
 
-    MPI_Scatterv(matrix, sendCounts, displacements, MPI_DOUBLE, myMatrix, myRows * cols, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-
-    MPI_Bcast(vector, cols, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-
-    for (int i = 0; i < myRows; ++i) {
-        myResult[i] = 0.0;
-        for (int j = 0; j < cols; ++j) {
-            myResult[i] += myMatrix[i * cols + j] * vector[j];
-        }
-    }
-
-    if (rank == 0) {
-        for (int i = 0; i < size; i++) {
-            sendCounts[i] = i < remainingRows ? blockSize + 1 : blockSize;
-            displacements[i] = (i > 0) ? displacements[i - 1] + sendCounts[i - 1] : 0;
-        }
-    }
-
-    MPI_Gatherv(myResult, myRows, MPI_DOUBLE, result, sendCounts, displacements, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-
-    free(myMatrix);
-    free(myResult);
-    free(sendCounts);
+    free(localMatrixBlock);
+    free(localVector);
+    free(allResults);
     free(displacements);
+    free(counts);
+    free(recvCounts);
+    free(displacementsGather);
 }

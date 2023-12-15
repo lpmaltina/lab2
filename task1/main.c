@@ -29,7 +29,7 @@ int main(int argc, char** argv) {
     matrixCols = dim;
     matrix = (double*) malloc(matrixRows * matrixCols * sizeof(double));
     vec = (double*) malloc(matrixCols * sizeof(double));
-    product = (double*) malloc(matrixCols * sizeof(double));
+    product = (double*) malloc(matrixRows * sizeof(double));
 
     if (rank == 0){
         sprintf(fileNameMatrix, "input/matrix-%d-%d.txt", matrixRows, matrixCols);
