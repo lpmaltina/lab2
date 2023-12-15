@@ -38,7 +38,7 @@ int main(int argc, char** argv)
 		char fnameVec[FILE_NAME_LEN] = {0};
 
 		p_mat = malloc(matRowsN * matClmsN * sizeof(*p_mat));
-		p_rslt = malloc(matClmsN * sizeof(*p_rslt));
+		p_rslt = malloc(matRowsN * sizeof(*p_rslt));
 
 		sprintf(
 			fnameMat,
