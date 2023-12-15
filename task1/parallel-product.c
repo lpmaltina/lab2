@@ -27,8 +27,8 @@ void parallelProduct(double* matrix, double* vec, double* result, int matrixRows
     }
 
     MPI_Scatterv(matrix, counts, displacements, MPI_DOUBLE, localMatrixBlock, localBlockRows * matrixCols, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    MPI_Bcast(vec, matrixCols, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     double* localVector = (double*)malloc(sizeof(double) * matrixCols);
+    MPI_Bcast(vec, matrixCols, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     for (int i = 0; i < localBlockRows; ++i) {
         result[i] = 0.0;
