@@ -28,7 +28,7 @@ int main(){
     char fileNameMatrix[30];
     char fileNameVec[30];
 
-    for (dim = 2; dim <= 1024; dim *= 2) {
+    for (dim = 512; dim <= 8192; dim *= 2) {
         matrixRows = dim;
         matrixCols = dim;
 

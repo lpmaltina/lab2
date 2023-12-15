@@ -33,7 +33,7 @@ int main() {
     char fileNameVec[30];
     char fileNameResult[40];
 
-    for (dim = 2; dim <= 1024; dim *= 2) {
+    for (dim = 512; dim <= 8192; dim *= 2) {
         matrixRows = dim;
         matrixCols = dim;
 

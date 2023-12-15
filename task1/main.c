@@ -27,6 +27,9 @@ int main(int argc, char** argv)
 	int rank;
 	int size;
 
+    FILE* fp;
+    char* mode = argv[2];
+
 	MPI_Init(&argc, &argv); 
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
@@ -38,7 +41,7 @@ int main(int argc, char** argv)
 		char fnameVec[FILE_NAME_LEN] = {0};
 
 		p_mat = malloc(matRowsN * matClmsN * sizeof(*p_mat));
-		p_rslt = malloc(matRowsN * sizeof(*p_rslt));
+		p_rslt = malloc(matClmsN * sizeof(*p_rslt));
 
 		sprintf(
 			fnameMat,
@@ -69,10 +72,11 @@ int main(int argc, char** argv)
 
 	if (rank == 0) {
 		char fnameRslt[FILE_NAME_LEN] = {0};
+        char fnameTimings[FILE_NAME_LEN] = {0};
 
 		sprintf(
 			fnameRslt,
-			"output/parallel-p_rslt-%d-%d.txt",
+			"output/parallel-product-%d-%d.txt",
 			matRowsN,
 			matClmsN);
 
@@ -80,9 +84,18 @@ int main(int argc, char** argv)
 			puts("KU! OUTPUT FILENAME ERROR!");
 			MPI_Abort(MPI_COMM_WORLD, 1);
 		}
-		printf(
-			"Time (rows_n=%d, clms_n=%d, threads=%d): %lf\n",
-			matRowsN, matClmsN, size, timeElapsed);
+        
+        sprintf(fnameTimings, "timings/timings-%s.txt", mode);
+        fp = fopen(fnameTimings, "a");
+        fprintf(
+            fp,
+            "%d, %d, %d, %lf\n",
+            matRowsN,
+            matClmsN,
+            size,
+            timeElapsed
+        );
+        fclose(fp);
 
 		free(p_mat);
 		free(p_rslt);
