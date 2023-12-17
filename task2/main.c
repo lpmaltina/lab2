@@ -58,10 +58,11 @@ int main(int argc, char** argv)
 			MPI_Abort(MPI_COMM_WORLD, 1);
 		}
 
-		/* Pay attention to this: */
+		/* Pay attention to this */
 		free(p_vec);
-		p_vec = malloc(matRowsN * matClmsN * sizeof *p_mat);
-		memcpy(p_vec, p_mat, matRowsN * matClmsN * sizeof *p_mat);
+		p_vec = malloc(matRowsN * matClmsN * sizeof(*p_mat));
+		memcpy(p_vec, p_mat, matRowsN * matClmsN * sizeof(*p_mat));
+		/* END Pay attention to this */
 	}
 
 	MPI_Barrier(MPI_COMM_WORLD);
