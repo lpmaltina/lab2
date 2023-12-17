@@ -1,21 +1,10 @@
 #include "parallel.h"
 
 
-/* MPI_Bcast( */
-/* 	,  /\* INOUT buffer *\/ */
-/* 	,  /\* IN count *\/ */
-/* 	,  /\* IN datatype *\/ */
-/* 	,  /\* IN root *\/ */
-/* 	); /\* IN comm *\/ */
-
 void printMatSq(double const *const p_mat, int const ord);
-void printMat(double const *const p_mat, int const rows, int const clms);
-double *transMatSq(double const *const p_mat, int const ord);
-double *transMat(double const *const p_mat, int const rows, int const clms);
-double *incrMatSq(
-	double const *const p_mat, int const ord, int const ordNew);
-double* multMatsSq(double* p_matL, double* p_matR, int ord);
-
+double *mulMatsSq(double *p_matL, double *p_matR, int ord);
+void addToMatSq(double *p_matRslt, double *p_matAddend, int ord);
+double *rearngMatSq(double *const p_mat, int ord, int ordNew);
 
 void shftMatLtThr(
 	double *const p_mat,
@@ -42,6 +31,7 @@ int parallelProduct(
 {
 	int i = 0;
 	int j = 0;
+	int k = 0;
 
 	int ordNew = 0;
 	int rowsPerPrcsN = 0;
@@ -51,6 +41,8 @@ int parallelProduct(
 	double *p_matLNew = NULL;
 	double *p_matRNew = NULL;
 	double *p_matRNewT = NULL;
+	double **pp_matRslts = NULL;
+	double *p_matRslt = NULL;
 
 	double *p_l_matLElms = NULL;
 	double *p_l_matRElms = NULL;
@@ -76,7 +68,7 @@ int parallelProduct(
 	if (rnk == 0) {
 
 		puts("p_matLNew");
-		p_matLNew = incrMatSq(p_matR, ord, ordNew);
+		p_matLNew = rearngMatSq(p_matR, ord, ordNew);
 		printMatSq(p_matLNew, ordNew);
 
 		for (i = 0; i < sz; i++) {
@@ -89,11 +81,11 @@ int parallelProduct(
 				(ordNew / sz) * i);
 		}
 
-		puts("p_matLNew shifted");
-		printMatSq(p_matLNew, ordNew);
+		/* puts("p_matLNew shifted"); */
+		/* printMatSq(p_matLNew, ordNew); */
 
 		puts("p_matRNew");
-		p_matRNew = incrMatSq(p_matR, ord, ordNew);
+		p_matRNew = rearngMatSq(p_matR, ord, ordNew);
 		printMatSq(p_matRNew, ordNew);
 
 		for (i = 0; i < sz; i++) {
@@ -106,94 +98,78 @@ int parallelProduct(
 				(ordNew / sz) * i);
 		}
 
-		puts("p_matRNew shifted");
-		printMatSq(p_matRNew, ordNew);
+		/* puts("p_matRNew shifted"); */
+		/* printMatSq(p_matRNew, ordNew); */
 	}
 
 	p_l_matL = malloc((ordNew / sz) * (ordNew / sz) * sizeof *p_l_matL);
 	p_l_matR = malloc((ordNew / sz) * (ordNew / sz) * sizeof *p_l_matR);
 
-	for (i = 0; i < ordNew / sz; i++) {
-		MPI_Scatter(
-			p_matLNew + ordNew * i,       /* IN sendbuf */
-			ordNew / sz,                  /* IN sendcount */
-			MPI_DOUBLE,                   /* IN sendtype */
-			p_l_matL + (ordNew / sz) * i, /* OUT recvbuf */
-			ordNew / sz,                  /* IN recvcount */
-			MPI_DOUBLE,                   /* IN recvtype */
-			0,                            /* IN root */
-			MPI_COMM_WORLD);              /* IN comm */
-		MPI_Scatter(
-			p_matRNew + ordNew * i,       /* IN sendbuf */
-			ordNew / sz,                  /* IN sendcount */
-			MPI_DOUBLE,                   /* IN sendtype */
-			p_l_matR + (ordNew / sz) * i, /* OUT recvbuf */
-			ordNew / sz,                  /* IN recvcount */
-			MPI_DOUBLE,                   /* IN recvtype */
-			0,                            /* IN root */
-			MPI_COMM_WORLD);              /* IN comm */
+	pp_matRslts = calloc(sz, sizeof *pp_matRslts);
+	for (k = 0; k < sz; k++) {
+		pp_matRslts[k] = calloc(ordNew * ordNew, sizeof *pp_matRslts);
+		for (j = 0; j < sz; j++) {
+			for (i = 0; i < ordNew / sz; i++) {
+				MPI_Scatter(
+					p_matLNew + ordNew*(ordNew / sz)*j + ordNew*i, /* IN sendbuf */
+					ordNew / sz,                  /* IN sendcount */
+					MPI_DOUBLE,                   /* IN sendtype */
+					p_l_matL + (ordNew / sz) * i, /* OUT recvbuf */
+					ordNew / sz,                  /* IN recvcount */
+					MPI_DOUBLE,                   /* IN recvtype */
+					0,                            /* IN root */
+					MPI_COMM_WORLD);              /* IN comm */
+				MPI_Scatter(
+					p_matRNew + ordNew*(ordNew / sz)*j + ordNew*i, /* IN sendbuf */
+					ordNew / sz,                  /* IN sendcount */
+					MPI_DOUBLE,                   /* IN sendtype */
+					p_l_matR + (ordNew / sz) * i, /* OUT recvbuf */
+					ordNew / sz,                  /* IN recvcount */
+					MPI_DOUBLE,                   /* IN recvtype */
+					0,                            /* IN root */
+					MPI_COMM_WORLD);              /* IN comm */
+			}
+
+			p_l_matRslt = mulMatsSq(p_l_matL, p_l_matR, ordNew / sz);
+
+			for (i = 0; i < ordNew / sz; i++) {
+				MPI_Gather(
+					p_l_matRslt + (ordNew / sz) * i, /* IN sendbuf */
+					ordNew / sz,                     /* IN sendcount */
+					MPI_DOUBLE,                      /* IN sendtype */
+					pp_matRslts[k] + ordNew*(ordNew / sz)*j + ordNew*i, /* OUT recvbuf */
+					ordNew / sz,                     /* IN recvcount */
+					MPI_DOUBLE,                      /* IN recvtype */
+					0,                               /* IN root */
+					MPI_COMM_WORLD);                 /* IN comm */
+			}
+
+			if (rnk == 0) {
+				puts("p_l_matL, p_l_matR, p_l_matRslt");
+				printMatSq(p_l_matL, ordNew / sz);
+				printMatSq(p_l_matR, ordNew / sz);
+				printMatSq(p_l_matRslt, ordNew / sz);
+			}
+		}
+		if (rnk == 0) {
+			printf("pp_matRslts[%d]\n", k);
+			printMatSq(pp_matRslts[k], ordNew);
+			shftMatLtThr(p_matLNew, ordNew, ordNew, 0, ordNew, ordNew / sz);
+			shftMatUpThr(p_matRNew, ordNew, ordNew, 0, ordNew, ordNew / sz);
+		}
 	}
 
-	p_l_matRslt = multMatsSq(p_l_matL, p_l_matR, ordNew / sz);
-
-	/* if (rnk == 0) { */
-	/* 	printMat(p_l_matL, ordNew / sz, ordNew / sz); */
-	/* 	printMat(p_l_matR, ordNew / sz, ordNew / sz); */
-	/* 	printMat(p_l_matRslt, ordNew / sz, ordNew / sz); */
-	/* } */
-
-	/* MPI_Scatter( */
-	/* 	p_matLNew,              /\* IN sendbuf *\/ */
-	/* 	ordNew * (ordNew / sz), /\* IN sendcount *\/ */
-	/* 	MPI_DOUBLE,             /\* IN sendtype *\/ */
-	/* 	p_l_matLElms,           /\* OUT recvbuf *\/ */
-	/* 	ordNew * (ordNew / sz), /\* IN recvcount *\/ */
-	/* 	MPI_DOUBLE,             /\* IN recvtype *\/ */
-	/* 	0,                      /\* IN root *\/ */
-	/* 	MPI_COMM_WORLD);        /\* IN comm *\/ */
-
-	/* MPI_Scatter( */
-	/* 	p_matRNewT,             /\* IN sendbuf *\/ */
-	/* 	ordNew * (ordNew / sz), /\* IN sendcount *\/ */
-	/* 	MPI_DOUBLE,             /\* IN sendtype *\/ */
-	/* 	p_l_matRElmsT,           /\* OUT recvbuf *\/ */
-	/* 	ordNew * (ordNew / sz), /\* IN recvcount *\/ */
-	/* 	MPI_DOUBLE,             /\* IN recvtype *\/ */
-	/* 	0,                      /\* IN root *\/ */
-	/* 	MPI_COMM_WORLD);        /\* IN comm *\/ */
-
-	/* Every process got its macro row and macro column, but macro */
-	/* column shall be transposed to act in matrix multiplying. */
-
-	/* p_l_matRElms = transMat(p_l_matRElmsT, ordNew / sz, ordNew); */
-
-	/* if (rnk == 0) { */
-	/* 	puts("p_l_matLElms"); */
-	/* 	printMat(p_l_matLElms, ordNew / sz, ordNew); */
-
-	/* 	puts("p_l_matRElms"); */
-	/* 	printMat(p_l_matRElms, ordNew, ordNew / sz); */
-	/* } */
-
-	/* for (i = 0; i < (rnk + 1) * 2000000000; i++); */
-
-	/* printf("p_l_matRElmsT %d\n", rnk); */
-	/* printMat(p_l_matRElmsT, ordNew / sz, ordNew); */
-
-	/* printf("p_l_matRElmsT %d shfted\n", rnk); */
-	/* shftMatLtThr(p_l_matRElmsT, ordNew / sz, ordNew, (ordNew / sz) * rnk); */
-	/* printMat(p_l_matRElmsT, ordNew / sz, ordNew); */
-
-	/* puts("p_l_matRElms"); */
-	/* printMat(p_l_matRElms, ordNew, ordNew / sz); */
-
-	/* shftMatLtThr(p_l_matRElms, ordNew, ordNew / sz, rnk); */
-
-	/* if (rnk == 0) { */
-	/* 	for (i = 0; i < 2000000000; i++); */
-	/* 	puts("p_l_matRElms shfted"); */
-	/* 	printMat(p_l_matRElms, ordNew, ordNew / sz); */
-	/* } */
+	if (rnk == 0) {
+		p_matRslt = calloc(ordNew * ordNew, sizeof *p_matRslt);
+		for (i = 0; i < sz; i++) {
+			addToMatSq(p_matRslt, pp_matRslts[i], ordNew);
+		}
+	
+		puts("here am I");
+		printMatSq(
+			rearngMatSq(p_matRslt, ordNew, ord),
+			ord);
+	}
 
 	return 0;
 }
@@ -234,7 +210,7 @@ void shftMatUpThr(
 	int clmEnd,
 	int shft)
 {
-	double* p_matTmp = NULL;
+	double *p_matTmp = NULL;
 	int shftNew = -shft % rows;
 
 	if (shftNew == 0) { return; }
@@ -253,7 +229,7 @@ void shftMatUpThr(
 	return;
 }
 
-double* multMatsSq(double* p_matL, double* p_matR, int ord)
+double *mulMatsSq(double *p_matL, double *p_matR, int ord)
 {
 	double *p_matRslt = malloc(ord * ord * sizeof *p_matRslt);
 
@@ -270,49 +246,35 @@ double* multMatsSq(double* p_matL, double* p_matR, int ord)
 	return p_matRslt;
 }
 
-double *transMat(double const *const p_mat, int const rows, int const clms)
+void addToMatSq(double *p_matRslt, double *p_matAddend, int ord)
 {
-	double *const p_matRslt = malloc(rows * clms * sizeof *p_matRslt);
-	for (int i = 0; i < clms; i++) {
-		for (int j = 0; j < rows; j++) {
-			p_matRslt[i * rows + j] = p_mat[j * clms + i];
-		}
-	}
-	return p_matRslt;
-}
-
-double *transMatSq(double const *const p_mat, int const ord)
-{
-	return transMat(p_mat, ord, ord);
-}
-
-double *incrMatSq(
-	double const *const p_mat, int const ord, int const ordNew)
-{
-	double *p_matRslt = calloc(ordNew * ordNew, sizeof *p_matRslt);
 	for (int i = 0; i < ord; i++) {
 		for (int j = 0; j < ord; j++) {
+			p_matRslt[i * ord + j] += p_matAddend[i * ord + j];
+		}
+	}
+}
+
+double *rearngMatSq(double *const p_mat, int ord, int ordNew)
+{
+	double *p_matRslt = calloc(ordNew * ordNew, sizeof *p_matRslt);
+	for (int i = 0; i < ord && i < ordNew; i++) {
+		for (int j = 0; j < ord && j < ordNew; j++) {
 			p_matRslt[i * ordNew + j] = p_mat[i * ord + j];
 		}
 	}
 	return p_matRslt;
 }
 
-void printMat(double const *const p_mat, int const rows, int const clms)
+void printMatSq(double const *const p_mat, int const ord)
 {
-	for (int i = 0; i < rows; i++) {
-		for (int j = 0; j < clms; j++) {
-			printf("%.1lf\t", p_mat[i * clms + j]);
+	for (int i = 0; i < ord; i++) {
+		for (int j = 0; j < ord; j++) {
+			printf("%.2lf    \t", p_mat[i * ord + j]);
 		}
 		printf("\n");
 	}
 	printf("\n");
 
-	return;
-}
-
-void printMatSq(double const *const p_mat, int const ord)
-{
-	printMat(p_mat, ord, ord);
 	return;
 }
