@@ -10,8 +10,6 @@
 
 int main(int argc, char** argv)
 {
-	int lclTmp;
-
 	double* p_mat = NULL;
 	double* p_vec = NULL;
 	double* p_rslt = NULL;
@@ -27,8 +25,8 @@ int main(int argc, char** argv)
 	int rank;
 	int size;
 
-    FILE* fp;
-    char* mode = argv[2];
+	FILE* fp;
+	char* mode = argv[2];
 
 	MPI_Init(&argc, &argv); 
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -43,12 +41,7 @@ int main(int argc, char** argv)
 		p_mat = malloc(matRowsN * matClmsN * sizeof(*p_mat));
 		p_rslt = malloc(matClmsN * sizeof(*p_rslt));
 
-		sprintf(
-			fnameMat,
-			"input/mat-%d-%d.txt",
-			matRowsN,
-			matClmsN);
-
+		sprintf(fnameMat, "input/mat-%d-%d.txt", matRowsN, matClmsN);
 		if (readArray(fnameMat, p_mat, matRowsN * matClmsN)) {
 			puts("KU! INPUT MATRIX FILENAME ERROR!");
 			MPI_Abort(MPI_COMM_WORLD, 1);
@@ -65,14 +58,16 @@ int main(int argc, char** argv)
 	if (rank == 0) { timeStrt = MPI_Wtime(); }
 	parallelProduct(p_mat, p_vec, p_rslt, matRowsN, matClmsN, rank, size);
 	MPI_Barrier(MPI_COMM_WORLD);
+
 	if (rank == 0) {
 		timeFnsh = MPI_Wtime();
 		timeElapsed = timeFnsh - timeStrt;
 	}
 
 	if (rank == 0) {
+
 		char fnameRslt[FILE_NAME_LEN] = {0};
-        char fnameTimings[FILE_NAME_LEN] = {0};
+		char fnameTimings[FILE_NAME_LEN] = {0};
 
 		sprintf(
 			fnameRslt,
@@ -85,17 +80,27 @@ int main(int argc, char** argv)
 			MPI_Abort(MPI_COMM_WORLD, 1);
 		}
         
-        sprintf(fnameTimings, "timings/timings-%s.txt", mode);
-        fp = fopen(fnameTimings, "a");
-        fprintf(
-            fp,
-            "%d, %d, %d, %lf\n",
-            matRowsN,
-            matClmsN,
-            size,
-            timeElapsed
-        );
-        fclose(fp);
+		sprintf(fnameTimings, "timings/timings-%s.txt", mode);
+		fp = fopen(fnameTimings, "a");
+		if (fp == NULL) {
+			puts("ERR: CREATE \"timings\" DIR TO LOG TIMINGS");
+			MPI_Finalize();
+			return 0;
+		}
+		if (mode == NULL) {
+			puts("WRN: Specify mode (parallel, serial, etc)");
+			puts("WRN: to properly name a file in log dir.");
+			puts("WRN: Current log will be \"...(null).txt\"");
+		}
+		fprintf(
+			fp,
+			"%d, %d, %d, %lf\n",
+			matRowsN,
+			matClmsN,
+			size,
+			timeElapsed
+		);
+		fclose(fp);
 
 		free(p_mat);
 		free(p_rslt);

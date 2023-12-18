@@ -33,7 +33,7 @@ int main() {
     char fileNameVec[30];
     char fileNameResult[40];
 
-    for (dim = 512; dim <= 8192; dim *= 2) {
+    for (dim = 8; dim <= 16; dim *= 2) {
         matrixRows = dim;
         matrixCols = dim;
 
@@ -41,7 +41,7 @@ int main() {
         vec = (double*) malloc(matrixCols * sizeof(double));
         product = (double*) malloc(matrixRows * sizeof(double));
         
-        sprintf(fileNameMatrix, "input/matrix-%d-%d.txt", matrixRows, matrixCols);
+        sprintf(fileNameMatrix, "input/mat-%d-%d.txt", matrixRows, matrixCols);
         readArray(fileNameMatrix, matrix, matrixRows * matrixCols);
 
         sprintf(fileNameVec, "input/vec-%d.txt", matrixCols);
