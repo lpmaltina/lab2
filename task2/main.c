@@ -3,6 +3,7 @@
 #include <string.h>
 #include <mpi.h>
 #include "utils.h"
+
 #include "parallel.h"
 
 
@@ -11,8 +12,8 @@
 
 int main(int argc, char** argv)
 {
-	double* p_mat = NULL;
-	double* p_vec = NULL;
+	double* p_matA = NULL;
+	double* p_matB = NULL;
 	double* p_rslt = NULL;
 
 	double timeStrt = 0.;
@@ -30,42 +31,33 @@ int main(int argc, char** argv)
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-	p_vec = malloc(matClmsN * sizeof(*p_vec));
-
 	if (rank == 0) {
-		char fnameMat[FILE_NAME_LEN] = {0};
-		char fnameVec[FILE_NAME_LEN] = {0};
+		char fnameMatA[FILE_NAME_LEN] = {0};
+		char fnameMatB[FILE_NAME_LEN] = {0};
 
-		p_mat = malloc(matRowsN * matClmsN * sizeof(*p_mat));
+		p_matA = malloc(matRowsN * matClmsN * sizeof(*p_matA));
+		p_matB = malloc(matRowsN * matClmsN * sizeof(*p_matB));
 		p_rslt = malloc(matRowsN * matClmsN * sizeof(*p_rslt));
 
-		sprintf(
-			fnameMat,
-			"input/mat-%d-%d.txt",
-			matRowsN,
-			matClmsN);
-
-		if (readArray(fnameMat, p_mat, matRowsN * matClmsN)) {
-			puts("KU! INPUT MATRIX FILENAME ERROR!");
+		sprintf(fnameMatA, "input/matA-%d-%d.txt", matRowsN, matClmsN);
+		if (readArray(fnameMatA, p_matA, matRowsN * matClmsN)) {
+			puts("KU! INPUT MATRIX A FILENAME ERROR!");
 			MPI_Abort(MPI_COMM_WORLD, 1);
 		}
 
-		sprintf(fnameVec, "input/vec-%d.txt", matClmsN);
-		if (readArray(fnameVec, p_vec, matClmsN)) {
-			puts("KU! INPUT VECTOR FILENAME ERROR!");
+		sprintf(fnameMatB, "input/matB-%d-%d.txt", matRowsN, matClmsN);
+		if (readArray(fnameMatB, p_matB, matRowsN * matClmsN)) {
+			puts("KU! INPUT MATRIX B FILENAME ERROR!");
 			MPI_Abort(MPI_COMM_WORLD, 1);
 		}
 
-		/* Pay attention to this */
-		free(p_vec);
-		p_vec = malloc(matRowsN * matClmsN * sizeof(*p_mat));
-		memcpy(p_vec, p_mat, matRowsN * matClmsN * sizeof(*p_mat));
-		/* END Pay attention to this */
+		if (matRowsN == matClmsN) { printMatSq(p_matA, matRowsN); }
+		if (matRowsN == matClmsN) { printMatSq(p_matB, matRowsN); }
 	}
 
 	MPI_Barrier(MPI_COMM_WORLD);
 	if (rank == 0) { timeStrt = MPI_Wtime(); }
-	parallelProduct(p_mat, p_vec, p_rslt, matRowsN);
+	parallelProduct(p_matA, p_matB, p_rslt, matRowsN);
 	MPI_Barrier(MPI_COMM_WORLD);
 	if (rank == 0) {
 		timeFnsh = MPI_Wtime();
@@ -75,9 +67,11 @@ int main(int argc, char** argv)
 	if (rank == 0) {
 		char fnameRslt[FILE_NAME_LEN] = {0};
 
+		if (matRowsN == matClmsN) { printMatSq(p_rslt, matRowsN); }
+
 		sprintf(
 			fnameRslt,
-			"output/parallel-p_rslt-%d-%d.txt",
+			"output/parallel-cannon-%d-%d.txt",
 			matRowsN,
 			matClmsN);
 
@@ -89,11 +83,10 @@ int main(int argc, char** argv)
 			"Time (rows_n=%d, clms_n=%d, threads=%d): %lf\n",
 			matRowsN, matClmsN, size, timeElapsed);
 
-		free(p_mat);
+		free(p_matA);
+		free(p_matB);
 		free(p_rslt);
 	}
-
-	free(p_vec);
 
 	MPI_Finalize();
 	return 0;

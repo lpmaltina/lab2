@@ -7,10 +7,7 @@
 #include <mpi.h>
 
 
-int parallelProduct(
-	double* matrix,
-	double* vector,
-	double* result,
-	int ord);
+int parallelProduct(double *matrix, double *vector, double *result, int ord);
+void printMatSq(double const *const p_mat, int const ord);
 
 #endif //PARALLEL
